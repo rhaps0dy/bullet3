@@ -139,6 +139,7 @@ struct MyMJCFDefaults
 
 	// joint defaults
 	std::string m_defaultJointLimited;
+	double m_defaultJointFriction;
 
 	// geom defaults
 	std::string m_defaultGeomRgba;
@@ -151,6 +152,7 @@ struct MyMJCFDefaults
 		:m_defaultCollisionGroup(1),
 		m_defaultCollisionMask(1),
 		m_defaultCollisionMargin(0.001),//assume unit meters, margin is 1mm
+		m_defaultJointFriction(0.0),
 		m_defaultConDim(3),
 		m_defaultLateralFriction(0.5),
 		m_defaultSpinningFriction(0),
@@ -325,6 +327,10 @@ struct BulletMJCFImporterInternalData
 				{
 					defaults.m_defaultJointLimited = child_xml->Attribute("limited");
 				}
+				if (const char* frictionStr = child_xml->Attribute("frictionloss"))
+				{
+					defaults.m_defaultJointFriction = urdfLexicalCast<double>(frictionStr);
+				}
 			}
 			if (n=="geom")
 			{
@@ -455,6 +461,7 @@ struct BulletMJCFImporterInternalData
 		const char* ornStr = link_xml->Attribute("quat");
 		const char* nameStr = link_xml->Attribute("name");
 		const char* rangeStr = link_xml->Attribute("range");
+		const char* frictionStr = link_xml->Attribute("frictionloss");
 
 		btTransform jointTrans;
 		jointTrans.setIdentity();
@@ -557,6 +564,12 @@ struct BulletMJCFImporterInternalData
 			}
 		}
 
+		double jointFriction = defaults.m_defaultJointFriction;
+		if (frictionStr)
+		{
+			jointFriction = urdfLexicalCast<double>(frictionStr);
+		}
+
 		// TODO armature : real, "0" Armature inertia (or rotor inertia) of all
 		// degrees of freedom created by this joint. These are constants added to the
 		// diagonal of the inertia matrix in generalized coordinates. They make the
@@ -593,6 +606,7 @@ struct BulletMJCFImporterInternalData
 			jointPtr->m_localJointAxis=jointAxis;
 			jointPtr->m_parentLinkToJointTransform = parentLinkToJointTransform;
 			jointPtr->m_type = ejtype;
+			jointPtr->m_jointFriction = jointFriction;
 			int numJoints = m_models[modelIndex]->m_joints.size();
 
 			//range
