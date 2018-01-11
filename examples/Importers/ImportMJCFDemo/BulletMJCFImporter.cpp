@@ -140,6 +140,7 @@ struct MyMJCFDefaults
 
 	// joint defaults
 	std::string m_defaultJointLimited;
+	double m_defaultJointDamping;
 
 	// geom defaults
 	std::string m_defaultGeomRgba;
@@ -152,6 +153,7 @@ struct MyMJCFDefaults
 		:m_defaultCollisionGroup(1),
 		m_defaultCollisionMask(1),
 		m_defaultCollisionMargin(0.001),//assume unit meters, margin is 1mm
+		m_defaultJointDamping(0.0),
 		m_defaultConDim(3),
 		m_defaultLateralFriction(0.5),
 		m_defaultSpinningFriction(0),
@@ -331,6 +333,10 @@ struct BulletMJCFImporterInternalData
 				{
 					defaults.m_defaultJointLimited = child_xml->Attribute("limited");
 				}
+				if (const char* dampingStr = child_xml->Attribute("damping"))
+				{
+					defaults.m_defaultJointDamping = urdfLexicalCast<double>(dampingStr);
+				}
 			}
 			if (n=="geom")
 			{
@@ -461,6 +467,7 @@ struct BulletMJCFImporterInternalData
 		const char* ornStr = link_xml->Attribute("quat");
 		const char* nameStr = link_xml->Attribute("name");
 		const char* rangeStr = link_xml->Attribute("range");
+		const char* dampingStr = link_xml->Attribute("damping");
 
 		btTransform jointTrans;
 		jointTrans.setIdentity();
@@ -563,6 +570,12 @@ struct BulletMJCFImporterInternalData
 			}
 		}
 
+		double jointDamping = defaults.m_defaultJointDamping;
+		if(dampingStr)
+		{
+			jointDamping = urdfLexicalCast<double>(dampingStr);
+		}
+
 		// TODO armature : real, "0" Armature inertia (or rotor inertia) of all
 		// degrees of freedom created by this joint. These are constants added to the
 		// diagonal of the inertia matrix in generalized coordinates. They make the
@@ -574,17 +587,8 @@ struct BulletMJCFImporterInternalData
 		// the robot parts that are represented explicitly in the model, and the
 		// armature attribute is the way to model them.
 
-		// TODO damping : real, "0" Damping applied to all degrees of
-		// freedom created by this joint. Unlike friction loss
-		// which is computed by the constraint solver, damping is
-		// simply a force linear in velocity. It is included in
-		// the passive forces. Despite this simplicity, larger
-		// damping values can make numerical integrators unstable,
-		// which is why our Euler integrator handles damping
-		// implicitly. See Integration in the Computation chapter.
-
 		const UrdfLink* linkPtr = getLink(modelIndex,linkIndex);
-		
+
 		btTransform parentLinkToJointTransform;
 		parentLinkToJointTransform.setIdentity();
 		parentLinkToJointTransform = parentToLinkTrans*jointTrans;
@@ -599,6 +603,7 @@ struct BulletMJCFImporterInternalData
 			jointPtr->m_localJointAxis=jointAxis;
 			jointPtr->m_parentLinkToJointTransform = parentLinkToJointTransform;
 			jointPtr->m_type = ejtype;
+			jointPtr->m_jointDamping = jointDamping;
 			int numJoints = m_models[modelIndex]->m_joints.size();
 
 			//range
